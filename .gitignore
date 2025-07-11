@@ -1,0 +1,31 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.log
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Editor-specific
+.vscode/
+.idea/
+
+# Environment configs
+.env
+
+# Docker/Database volumes
+airflow/logs/
+airflow/data/
+airflow/postgres-db-volume/
+
+# Caches
+*.sqlite3
+*.db
+.airflowignore
