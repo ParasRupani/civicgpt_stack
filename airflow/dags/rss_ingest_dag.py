@@ -63,5 +63,4 @@ with DAG(
         task_id="fetch_rss_news",
         python_callable=fetch_rss
     )
-
-    fetch_news
+    
