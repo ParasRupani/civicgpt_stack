@@ -11,31 +11,36 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 
 def fetch_rss():
-    FEED_URL = "https://www.cbc.ca/cmlink/rss-canada"
-
-    # Fix: Add custom User-Agent to avoid RemoteDisconnected
-    request = urllib.request.Request(
-        FEED_URL,
-        headers={
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'application/rss+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Referer': 'https://www.cbc.ca'
-        }
-    )
-
-    # Fetch and parse manually
-    with urllib.request.urlopen(request) as response:
-        raw_data = response.read()
-        feed = feedparser.parse(raw_data)
+    FEED_URLS = [
+    "http://rss.cbc.ca/lineup/canada-kitchenerwaterloo.xml",
+    "http://rss.cbc.ca/lineup/canada-toronto.xml",
+    "https://www.cbc.ca/webfeed/rss/rss-canada"
+    ]
 
     articles = []
-    for entry in feed.entries:
-        articles.append({
-            "title": entry.title,
-            "summary": entry.summary,
-            "link": entry.link,
-            "published": entry.published
-        })
+
+    for FEED_URL in FEED_URLS:
+        request = urllib.request.Request(
+            FEED_URL,
+            headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'application/rss+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Referer': 'https://www.cbc.ca'
+            }
+        )
+
+        with urllib.request.urlopen(request) as response:
+            raw_data = response.read()
+            feed = feedparser.parse(raw_data)
+
+        for entry in feed.entries:
+            articles.append({
+                "title": entry.title,
+                "summary": entry.summary,
+                "link": entry.link,
+                "published": entry.published,
+                "source": FEED_URL  # Optional: tag the source
+            })
 
     # Save to mounted Docker volume
     save_path = "/opt/airflow/data/raw/news"
@@ -43,6 +48,7 @@ def fetch_rss():
     filename = f"{save_path}/{datetime.now().strftime('%Y-%m-%d')}.json"
     with open(filename, "w") as f:
         json.dump(articles, f, indent=2)
+
 
 with DAG(
     dag_id="rss_ingest_dag",
