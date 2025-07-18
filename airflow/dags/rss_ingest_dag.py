@@ -1,66 +1,67 @@
+from dotenv import load_dotenv
+import sys
+import os
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-from datetime import datetime
-import feedparser
-import urllib.request
-import json
-import os
-from dotenv import load_dotenv
+from airflow.operators.bash import BashOperator
+from datetime import datetime, timedelta
+import logging
 
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
+# Add project root to path
+DAGS_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.abspath(os.path.join(DAGS_DIR, ".."))
+sys.path.insert(0, ROOT_DIR)
 
+# Import fetch function
+from utils.fetch_news import fetch_rss
 
-def fetch_rss():
-    FEED_URLS = [
-    "http://rss.cbc.ca/lineup/canada-kitchenerwaterloo.xml",
-    "http://rss.cbc.ca/lineup/canada-toronto.xml",
-    "https://www.cbc.ca/webfeed/rss/rss-canada"
-    ]
+# Load environment variables
+load_dotenv(dotenv_path=os.path.join(ROOT_DIR, '.env'))
 
-    articles = []
+# Task failure alert
+def task_failure_alert(context):
+    dag_id = context.get('dag').dag_id
+    task_id = context.get('task_instance').task_id
+    exec_date = context.get('execution_date')
+    log_url = context.get('task_instance').log_url
 
-    for FEED_URL in FEED_URLS:
-        request = urllib.request.Request(
-            FEED_URL,
-            headers={
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'application/rss+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Referer': 'https://www.cbc.ca'
-            }
-        )
+    logging.error(
+        f"""
+        Task Failed:
+        DAG ID: {dag_id}
+        Task ID: {task_id}
+        Execution Time: {exec_date}
+        Log URL: {log_url}
+        """
+    )
 
-        with urllib.request.urlopen(request) as response:
-            raw_data = response.read()
-            feed = feedparser.parse(raw_data)
-
-        for entry in feed.entries:
-            articles.append({
-                "title": entry.title,
-                "summary": entry.summary,
-                "link": entry.link,
-                "published": entry.published,
-                "source": FEED_URL  # Optional: tag the source
-            })
-
-    # Save to mounted Docker volume
-    save_path = "/opt/airflow/data/raw/news"
-    os.makedirs(save_path, exist_ok=True)
-    filename = f"{save_path}/{datetime.now().strftime('%Y-%m-%d')}.json"
-    with open(filename, "w") as f:
-        json.dump(articles, f, indent=2)
-
+default_args = {
+    "owner": "airflow",
+    "retries": 3,
+    "retry_delay": timedelta(minutes=5),
+    "on_failure_callback": task_failure_alert,
+}
 
 with DAG(
     dag_id="rss_ingest_dag",
-    description="Fetch civic news from CBC RSS",
+    description="Fetch civic news from CBC RSS feeds, validate and store as JSON",
     schedule_interval="@daily",
     start_date=datetime(2025, 7, 10),
     catchup=False,
-    tags=["rss", "news"],
+    default_args=default_args,
+    tags=["rss", "news", "ingestion"],
 ) as dag:
 
-    fetch_news = PythonOperator(
+    fetch_news_task = PythonOperator(
         task_id="fetch_rss_news",
         python_callable=fetch_rss
     )
+
+    transform_news = BashOperator(
+        task_id='transform_news',
+        bash_command='spark-submit /opt/airflow/app/etl/spark_transform.py',
+        dag=dag,
+    )
+    
+    fetch_news_task >> transform_news
     

@@ -12,7 +12,10 @@ services:
       - ./airflow/postgres-db-volume:/var/lib/postgresql/data
 
   airflow-webserver:
-    image: apache/airflow:2.8.1-python3.11
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: custom-airflow:web
     env_file: .env
     depends_on:
       - postgres
@@ -22,19 +25,24 @@ services:
       AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       AIRFLOW__WEBSERVER__RBAC: "True"
       AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "True"
-      _PIP_ADDITIONAL_REQUIREMENTS: "feedparser"
+      PYTHONPATH: /opt/airflow/dags
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/data:/opt/airflow/data
       - ./airflow/plugins:/opt/airflow/plugins
-      - ./airflow/requirements.txt:/requirements.txt
+      - ./requirements.txt:/requirements.txt
+      - ./airflow:/opt/airflow
+      - ./app:/opt/airflow/app 
     ports:
       - "8080:8080"
     command: >
       bash -c "pip install -r /requirements.txt && exec airflow webserver"
 
   airflow-scheduler:
-    image: apache/airflow:2.8.1-python3.11
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: custom-airflow:scheduler
     env_file: .env
     depends_on:
       - postgres
@@ -42,17 +50,22 @@ services:
       AIRFLOW__CORE__EXECUTOR: ${AIRFLOW__CORE__EXECUTOR}
       AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY}
       AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      _PIP_ADDITIONAL_REQUIREMENTS: "feedparser"
+      PYTHONPATH: /opt/airflow/dags
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/data:/opt/airflow/data
       - ./airflow/plugins:/opt/airflow/plugins
-      - ./airflow/requirements.txt:/requirements.txt
+      - ./requirements.txt:/requirements.txt
+      - ./airflow:/opt/airflow
+      - ./app:/opt/airflow/app 
     command: >
       bash -c "pip install -r /requirements.txt && exec airflow scheduler"
 
   airflow-init:
-    image: apache/airflow:2.8.1-python3.11
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: custom-airflow:init
     container_name: airflow_init
     depends_on:
       - postgres
@@ -63,7 +76,9 @@ services:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/logs:/opt/airflow/logs
       - ./airflow/plugins:/opt/airflow/plugins
-      - ./airflow/requirements.txt:/requirements.txt
+      - ./requirements.txt:/requirements.txt
+      - ./airflow:/opt/airflow
+      - ./app:/opt/airflow/app
     entrypoint: >
       bash -c "
         pip install -r /requirements.txt &&

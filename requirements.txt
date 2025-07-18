@@ -1,0 +1,26 @@
+# Core Airflow modules for syntax support
+apache-airflow==2.8.1  # Match your Docker version if possible
+apache-airflow-providers-http==4.5.2
+
+# Parsing & validation
+feedparser==6.0.10
+python-dotenv
+pydantic>=2.0
+beautifulsoup4
+pytest>=7.0
+utils
+
+# Optional: for development tools, IDE, and linting
+mypy
+flake8
+black
+isort
+
+
+pyspark==3.5.1
+textblob==0.17.1
+nltk
+pandas==2.2.2
+pyarrow==14.0.2
+fastparquet
+numpy==1.26.4
